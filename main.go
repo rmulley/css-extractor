@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"regexp"
+	"strings"
 ) //import
 
 type CssRule struct {
@@ -34,7 +35,8 @@ func main() {
 		err           error
 		lines         []string
 		allCssRules   = make(map[string][]CssRule)
-		findInlineCSS = regexp.MustCompile("<(\\w+)\\s.*?style=\"([\\w\\-]+):([\\w]+);\"")
+		findInlineCSS = regexp.MustCompile("<(\\w+)\\s(.*?)style=\"([\\w\\-]+):([\\w]+);\"")
+		findClasses   = regexp.MustCompile("class=\"(.*?)\"")
 	) //var
 
 	// Extract each line of the file
@@ -45,7 +47,7 @@ func main() {
 	for _, line := range lines {
 		if ctr == 28 {
 			// Determine if
-			if allCssRules = extractInlineCSS(line, findInlineCSS); err != nil {
+			if allCssRules = extractInlineCSS(line, findInlineCSS, findClasses); err != nil {
 				log.Println(err)
 			} //if
 		} //if
@@ -53,15 +55,28 @@ func main() {
 		ctr++
 	} //for
 
-	for k, v := range allCssRules {
-		log.Println(k)
-		log.Println(v)
+	var cssToAdd string
+
+	for element, rules := range allCssRules {
+		log.Println(element)
+		log.Println(rules)
 		log.Println("")
+
+		cssToAdd += element + "{"
+
+		for _, val := range rules {
+			cssToAdd += "\n\t" + val.Rule + ":\t" + val.Value
+		} //for
+
+		cssToAdd += "\n}\n"
 	} //for
+
+	log.Println("CSS to add:")
+	log.Println(cssToAdd)
 } //main
 
-func extractInlineCSS(line string, findInlineCSS *regexp.Regexp) (cssRules map[string][]CssRule) {
-	log.Println(line)
+func extractInlineCSS(line string, findInlineCSS, findClasses *regexp.Regexp) (cssRules map[string][]CssRule) {
+	//log.Println(line)
 	cssRules = make(map[string][]CssRule)
 	styles := findInlineCSS.FindAllStringSubmatch(line, -1)
 
@@ -74,9 +89,29 @@ func extractInlineCSS(line string, findInlineCSS *regexp.Regexp) (cssRules map[s
 				// Second position is tag name
 				if pos == 1 {
 					tag = v[pos]
-				} else if pos%2 == 0 {
-					// Even positions are rules
-					// Odd positions are values
+				} else if pos == 2 {
+					log.Println(v[pos])
+					classes := findClasses.FindAllStringSubmatch(v[pos], -1)
+
+					for _, allClasses := range classes {
+						for pos2, classes2 := range allClasses {
+							if pos2 != 0 {
+								var origTag string
+
+								origTag = tag
+								tag = ""
+
+								eachClass := strings.Split(classes2, " ")
+
+								for _, class := range eachClass {
+									tag += " " + origTag + "." + class
+								} //for
+							} //for
+						} //if
+					} //for
+				} else if pos%2 != 0 {
+					// Odd positions are rules
+					// Even positions are values
 					cssRules[tag] = append(cssRules[tag],
 						CssRule{
 							Rule:  v[pos],
