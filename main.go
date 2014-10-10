@@ -146,3 +146,13 @@ func readFile(filename string) (lines []string, err error) {
 
 	return lines, scanner.Err()
 } //readFile
+
+func writeCssFile(filename string) (err error) {
+
+	return err
+} //writeCssFile
+
+func addCssToHead(filename string) (err error) {
+
+	return err
+} //
