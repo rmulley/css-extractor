@@ -33,6 +33,7 @@ func init() {
 func main() {
 	var (
 		err           error
+		cssToAdd      string
 		lines         []string
 		allCssRules   = make(map[string][]CssRule)
 		findInlineCSS = regexp.MustCompile("<(\\w+)\\s(.*?)style=\"([\\w\\-]+):([\\w]+);\"")
@@ -54,8 +55,6 @@ func main() {
 
 		ctr++
 	} //for
-
-	var cssToAdd string
 
 	for element, rules := range allCssRules {
 		log.Println(element)
@@ -147,7 +146,7 @@ func readFile(filename string) (lines []string, err error) {
 	return lines, scanner.Err()
 } //readFile
 
-func writeCssFile(filename string) (err error) {
+func createCssFile(filename, css string) (err error) {
 
 	return err
 } //writeCssFile
@@ -155,4 +154,9 @@ func writeCssFile(filename string) (err error) {
 func addCssToHead(filename string) (err error) {
 
 	return err
-} //
+} //addCssToHead
+
+func removeStyleTags(filename string) (err error) {
+
+	return err
+} //removeStyleTags
