@@ -23,6 +23,7 @@ var (
 func init() {
 	// Retrieve flags & set globals
 	flag.StringVar(&I_FILENAME, "ifile", "", "Unable to set I_FILENAME flag variable.")
+	flag.StringVar(&O_FILENAME, "ofile", "", "Unable to set O_FILENAME flag variable.")
 	flag.Parse()
 
 	if I_FILENAME == "" {
@@ -72,6 +73,10 @@ func main() {
 
 	log.Println("CSS to add:")
 	log.Println(cssToAdd)
+
+	if err = createCssFile(O_FILENAME, cssToAdd); err != nil {
+
+	} //if
 } //main
 
 func extractInlineCSS(line string, findInlineCSS, findClasses *regexp.Regexp) (cssRules map[string][]CssRule) {
@@ -87,7 +92,7 @@ func extractInlineCSS(line string, findInlineCSS, findClasses *regexp.Regexp) (c
 			if pos != 0 {
 				// Second position is tag name
 				if pos == 1 {
-					tag = v[pos]
+					tag = strings.TrimSpace(v[pos])
 				} else if pos == 2 {
 					log.Println(v[pos])
 					classes := findClasses.FindAllStringSubmatch(v[pos], -1)
@@ -113,8 +118,8 @@ func extractInlineCSS(line string, findInlineCSS, findClasses *regexp.Regexp) (c
 					// Even positions are values
 					cssRules[tag] = append(cssRules[tag],
 						CssRule{
-							Rule:  v[pos],
-							Value: v[pos+1],
+							Rule:  strings.TrimSpace(v[pos]),
+							Value: strings.TrimSpace(v[pos+1]),
 						}) //append
 				} //elseif
 			} //if
@@ -147,8 +152,21 @@ func readFile(filename string) (lines []string, err error) {
 } //readFile
 
 func createCssFile(filename, css string) (err error) {
+	var (
+		oFile *os.File
+	) //var
 
-	return err
+	// Attempt to create the file
+	if oFile, err = os.Create(filename); err != nil {
+		return err
+	} //if
+	defer oFile.Close()
+
+	if _, err = oFile.Write([]byte(strings.TrimSpace(css))); err != nil {
+		return err
+	} //if
+
+	return nil
 } //writeCssFile
 
 func addCssToHead(filename string) (err error) {
