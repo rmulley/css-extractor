@@ -29,32 +29,39 @@ func init() {
 	if I_FILENAME == "" {
 		log.Fatalln("ifile parameter must be specificed.")
 	} //if
+
+	if O_FILENAME == "" {
+		log.Fatalln("ofile parameter must be specificed.")
+	} //if
 } //init
 
 func main() {
 	var (
-		err           error
-		cssToAdd      string
-		lines         []string
-		allCssRules   = make(map[string][]CssRule)
-		findInlineCSS = regexp.MustCompile("<(\\w+)\\s(.*?)style=\"([\\w\\-]+):([\\w]+);\"")
-		findClasses   = regexp.MustCompile("class=\"(.*?)\"")
+		err         error
+		cssToAdd    string
+		lines       []string
+		allCssRules = make(map[string][]CssRule)
+		//findInlineCSS    = regexp.MustCompile("<(\\w+)\\s(.*?)style=\"([\\w\\-]+):\\s*([\\w]+);\"")
+		findInlineCSS    = regexp.MustCompile("<(\\w+)\\s(.*?)style=\"(.*?)\"")
+		findClasses      = regexp.MustCompile("class=\"(.*?)\"")
+		replaceStyleTags = regexp.MustCompile("(.*?)style=\".*?\"(.*)")
 	) //var
 
 	// Extract each line of the file
 	if lines, err = readFile(I_FILENAME); err != nil {
 		log.Fatalln(err)
 	} //if
-	ctr := 0
-	for _, line := range lines {
-		if ctr == 28 {
-			// Determine if
-			if allCssRules = extractInlineCSS(line, findInlineCSS, findClasses); err != nil {
-				log.Println(err)
-			} //if
-		} //if
 
-		ctr++
+	for _, line := range lines {
+		temp := extractInlineCSS(line, findInlineCSS, findClasses)
+
+		for k, v := range temp {
+			if _, isSet := allCssRules[k]; isSet {
+				allCssRules[k] = append(allCssRules[k], v...)
+			} else {
+				allCssRules[k] = v
+			} //else
+		} //for
 	} //for
 
 	for element, rules := range allCssRules {
@@ -75,12 +82,15 @@ func main() {
 	log.Println(cssToAdd)
 
 	if err = createCssFile(O_FILENAME, cssToAdd); err != nil {
+		log.Fatalln(err)
+	} //if
 
+	if err = removeStyleTags(I_FILENAME, lines, replaceStyleTags); err != nil {
+		log.Fatalln(err)
 	} //if
 } //main
 
 func extractInlineCSS(line string, findInlineCSS, findClasses *regexp.Regexp) (cssRules map[string][]CssRule) {
-	//log.Println(line)
 	cssRules = make(map[string][]CssRule)
 	styles := findInlineCSS.FindAllStringSubmatch(line, -1)
 
@@ -94,7 +104,6 @@ func extractInlineCSS(line string, findInlineCSS, findClasses *regexp.Regexp) (c
 				if pos == 1 {
 					tag = strings.TrimSpace(v[pos])
 				} else if pos == 2 {
-					log.Println(v[pos])
 					classes := findClasses.FindAllStringSubmatch(v[pos], -1)
 
 					for _, allClasses := range classes {
@@ -113,14 +122,34 @@ func extractInlineCSS(line string, findInlineCSS, findClasses *regexp.Regexp) (c
 							} //for
 						} //if
 					} //for
-				} else if pos%2 != 0 {
-					// Odd positions are rules
-					// Even positions are values
-					cssRules[tag] = append(cssRules[tag],
-						CssRule{
-							Rule:  strings.TrimSpace(v[pos]),
-							Value: strings.TrimSpace(v[pos+1]),
-						}) //append
+				} else { // pos = 4 is the style tag
+					var (
+						items []string
+					) //var
+
+					items = strings.Split(v[pos], ";")
+
+					for _, item := range items {
+						if len(item) > 0 {
+							log.Println("item:", item)
+
+							rule := strings.Split(item, ":")
+							log.Println("rule: ", rule)
+
+							rule[0] = strings.TrimSpace(rule[0])
+							rule[1] = strings.TrimSpace(rule[1])
+
+							if rule[1][len(rule[1])-1:] != ";" {
+								rule[1] += ";"
+							} //if
+
+							cssRules[tag] = append(cssRules[tag],
+								CssRule{
+									Rule:  rule[0],
+									Value: rule[1],
+								}) //append
+						} //if
+					} //for
 				} //elseif
 			} //if
 		} //for
@@ -157,7 +186,7 @@ func createCssFile(filename, css string) (err error) {
 	) //var
 
 	// Attempt to create the file
-	if oFile, err = os.Create(filename); err != nil {
+	if oFile, err = os.OpenFile(filename, os.O_CREATE|os.O_RDWR, 0660); err != nil {
 		return err
 	} //if
 	defer oFile.Close()
@@ -169,12 +198,40 @@ func createCssFile(filename, css string) (err error) {
 	return nil
 } //writeCssFile
 
-func addCssToHead(filename string) (err error) {
+func removeStyleTags(filename string, lines []string, replaceStyleTags *regexp.Regexp) (err error) {
+	var (
+		oFile *os.File
+	) //var
 
-	return err
-} //addCssToHead
+	log.Println("Output:", filename+"_backup")
 
-func removeStyleTags(filename string) (err error) {
+	// Attempt to create the file
+	if oFile, err = os.OpenFile(filename+"_backup", os.O_CREATE|os.O_RDWR|os.O_APPEND, 0660); err != nil {
+		return err
+	} //if
+	defer oFile.Close()
+
+	for _, line := range lines {
+		styles := replaceStyleTags.FindAllStringSubmatch(line, -1)
+
+		for _, v := range styles {
+			for _, w := range v {
+				line = w
+			} //for
+		} //for
+
+		log.Println("LINE:", line)
+
+		if len(line) > 1 {
+			if line[len(line)-2:len(line)-1] != ">" {
+				line += ">"
+			} //if
+		} //if
+
+		if _, err = oFile.Write([]byte(strings.TrimSpace(line) + "\n")); err != nil {
+			return err
+		} //if
+	} //for
 
 	return err
 } //removeStyleTags
