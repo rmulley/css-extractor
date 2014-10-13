@@ -37,13 +37,13 @@ func init() {
 
 func main() {
 	var (
-		err         error
-		cssToAdd    string
-		lines       []string
-		allCssRules = make(map[string][]CssRule)
-		//findInlineCSS    = regexp.MustCompile("<(\\w+)\\s(.*?)style=\"([\\w\\-]+):\\s*([\\w]+);\"")
-		findInlineCSS    = regexp.MustCompile("<(\\w+)\\s(.*?)style=\"(.*?)\"")
+		err              error
+		cssToAdd         string
+		lines            []string
+		allCssRules      = make(map[string][]CssRule)
+		findInlineCSS    = regexp.MustCompile("<(\\w+)\\s.*?style=\"(.*?)\".*?>")
 		findClasses      = regexp.MustCompile("class=\"(.*?)\"")
+		findId           = regexp.MustCompile("id=\"([\\w\\-]+)\"")
 		replaceStyleTags = regexp.MustCompile("(.*?)style=\".*?\"(.*)")
 	) //var
 
@@ -53,7 +53,7 @@ func main() {
 	} //if
 
 	for _, line := range lines {
-		temp := extractInlineCSS(line, findInlineCSS, findClasses)
+		temp := extractInlineCSS(line, findInlineCSS, findId, findClasses)
 
 		for k, v := range temp {
 			if _, isSet := allCssRules[k]; isSet {
@@ -69,7 +69,7 @@ func main() {
 		log.Println(rules)
 		log.Println("")
 
-		cssToAdd += element + "{"
+		cssToAdd += element + " {"
 
 		for _, val := range rules {
 			cssToAdd += "\n\t" + val.Rule + ":\t" + val.Value
@@ -90,68 +90,71 @@ func main() {
 	} //if
 } //main
 
-func extractInlineCSS(line string, findInlineCSS, findClasses *regexp.Regexp) (cssRules map[string][]CssRule) {
+func extractInlineCSS(line string, findInlineCSS, findId, findClasses *regexp.Regexp) (cssRules map[string][]CssRule) {
 	cssRules = make(map[string][]CssRule)
 	styles := findInlineCSS.FindAllStringSubmatch(line, -1)
 
 	for _, v := range styles {
-		var tag string
+		var (
+			id, tag   string
+			eachClass []string
+		) //var
 
 		for pos, _ := range v {
 			// First position is entire capture
-			if pos != 0 {
-				// Second position is tag name
-				if pos == 1 {
-					tag = strings.TrimSpace(v[pos])
-				} else if pos == 2 {
+			if pos == 0 {
+				ids := findId.FindAllStringSubmatch(v[pos], -1)
+
+				log.Println("debug 1")
+
+				if len(ids) > 0 && len(ids[0]) > 0 {
+					id = ids[0][1]
+				} else {
 					classes := findClasses.FindAllStringSubmatch(v[pos], -1)
 
 					for _, allClasses := range classes {
 						for pos2, classes2 := range allClasses {
 							if pos2 != 0 {
-								var origTag string
-
-								origTag = tag
-								tag = ""
-
-								eachClass := strings.Split(classes2, " ")
-
-								for _, class := range eachClass {
-									tag += " " + origTag + "." + class
-								} //for
+								eachClass = strings.Split(classes2, " ")
 							} //for
 						} //if
 					} //for
-				} else { // pos = 4 is the style tag
-					var (
-						items []string
-					) //var
+				} //else
+			} else if pos == 1 { // Second position is tag name
+				element := strings.TrimSpace(v[pos])
 
-					items = strings.Split(v[pos], ";")
-
-					for _, item := range items {
-						if len(item) > 0 {
-							log.Println("item:", item)
-
-							rule := strings.Split(item, ":")
-							log.Println("rule: ", rule)
-
-							rule[0] = strings.TrimSpace(rule[0])
-							rule[1] = strings.TrimSpace(rule[1])
-
-							if rule[1][len(rule[1])-1:] != ";" {
-								rule[1] += ";"
-							} //if
-
-							cssRules[tag] = append(cssRules[tag],
-								CssRule{
-									Rule:  rule[0],
-									Value: rule[1],
-								}) //append
-						} //if
+				if len(id) > 0 {
+					tag = element + "#" + id
+				} else {
+					for _, class := range eachClass {
+						tag += " " + element + "." + class
 					} //for
-				} //elseif
-			} //if
+				} //else
+			} else if len(tag) > 0 { // pos = 3 is the style tag.  We are ignoring tags w/out a class or ID right now
+				var (
+					items []string
+				) //var
+
+				items = strings.Split(v[pos], ";")
+
+				for _, item := range items {
+					if len(item) > 0 {
+						rule := strings.Split(item, ":")
+						rule[0] = strings.TrimSpace(rule[0])
+						rule[1] = strings.TrimSpace(rule[1])
+
+						if rule[1][len(rule[1])-1:] != ";" {
+							rule[1] += ";"
+						} //if
+
+						cssRules[strings.TrimSpace(tag)] = append(cssRules[tag],
+							CssRule{
+								Rule:  rule[0],
+								Value: rule[1],
+							}) //append
+					} //if
+				} //for
+			} //else
 		} //for
 	} //for
 
@@ -219,8 +222,6 @@ func removeStyleTags(filename string, lines []string, replaceStyleTags *regexp.R
 				line = w
 			} //for
 		} //for
-
-		log.Println("LINE:", line)
 
 		if len(line) > 1 {
 			if line[len(line)-2:len(line)-1] != ">" {
