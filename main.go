@@ -22,16 +22,16 @@ var (
 
 func init() {
 	// Retrieve flags & set globals
-	flag.StringVar(&I_FILENAME, "ifile", "", "Unable to set I_FILENAME flag variable.")
-	flag.StringVar(&O_FILENAME, "ofile", "", "Unable to set O_FILENAME flag variable.")
+	flag.StringVar(&I_FILENAME, "i", "", "'i' parameter must be specificed.")
+	flag.StringVar(&O_FILENAME, "o", "", "'o' parameter must be specificed.")
 	flag.Parse()
 
 	if I_FILENAME == "" {
-		log.Fatalln("ifile parameter must be specificed.")
+		log.Fatalln("'i' parameter must be specificed.")
 	} //if
 
 	if O_FILENAME == "" {
-		log.Fatalln("ofile parameter must be specificed.")
+		log.Fatalln("'o' parameter must be specificed.")
 	} //if
 } //init
 
@@ -104,8 +104,6 @@ func extractInlineCSS(line string, findInlineCSS, findId, findClasses *regexp.Re
 			// First position is entire capture
 			if pos == 0 {
 				ids := findId.FindAllStringSubmatch(v[pos], -1)
-
-				log.Println("debug 1")
 
 				if len(ids) > 0 && len(ids[0]) > 0 {
 					id = ids[0][1]
