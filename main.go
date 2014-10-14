@@ -26,25 +26,26 @@ func init() {
 	flag.StringVar(&O_FILENAME, "o", "", "'o' parameter must be specificed.")
 	flag.Parse()
 
-	if strings.TrimSpace(I_FILENAME) == "" {
-		log.Fatalln("'i' parameter must be specificed.")
-	} //if
+	/*
+		if strings.TrimSpace(I_FILENAME) == "" {
+			log.Fatalln("'i' parameter must be specificed.")
+		} //if
 
-	if strings.TrimSpace(O_FILENAME) == "" {
-		log.Fatalln("'o' parameter must be specificed.")
-	} //if
+		if strings.TrimSpace(O_FILENAME) == "" {
+			log.Fatalln("'o' parameter must be specificed.")
+		} //if
+	*/
 } //init
 
 func main() {
 	var (
-		err              error
-		cssToAdd         string
-		lines            []string
-		allCssRules      = make(map[string][]CssRule)
-		findInlineCSS    = regexp.MustCompile("<(\\w+)\\s.*?style=\"(.*?)\".*?>")
-		findClasses      = regexp.MustCompile("class=\"(.*?)\"")
-		findId           = regexp.MustCompile("id=\"([\\w\\-]+)\"")
-		replaceStyleTags = regexp.MustCompile("(.*?)style=\".*?\"(.*)")
+		err           error
+		cssToAdd      string
+		lines         []string
+		allCssRules   = make(map[string][]CssRule)
+		findInlineCSS = regexp.MustCompile("<(\\w+)\\s.*?style=\"(.*?)\".*?>")
+		findClasses   = regexp.MustCompile("class=\"(.*?)\"")
+		findId        = regexp.MustCompile("id=\"([\\w\\-]+)\"")
 	) //var
 
 	// Extract each line of the file
@@ -78,7 +79,10 @@ func main() {
 		log.Fatalln(err)
 	} //if
 
-	if err = removeStyleTags(I_FILENAME, lines, replaceStyleTags); err != nil {
+	if err = createSourceFile(
+		I_FILENAME,
+		RemoveStyleTags(lines),
+	); err != nil {
 		log.Fatalln(err)
 	} //if
 } //main
@@ -191,9 +195,39 @@ func createCssFile(filename, css string) (err error) {
 	} //if
 
 	return nil
-} //writeCssFile
+} //createCssFile
 
-func removeStyleTags(filename string, lines []string, replaceStyleTags *regexp.Regexp) (err error) {
+func RemoveStyleTags(lines []string) (output string) {
+	var (
+		replaceStyleTags = regexp.MustCompile("(.*?)style=\".*?\"(.*)")
+	) //var
+
+	for _, line := range lines {
+		var (
+			styles [][]string
+		) //var
+
+		styles = replaceStyleTags.FindAllStringSubmatch(line, -1)
+
+		for _, v := range styles {
+			for pos, w := range v {
+				// Ignore first element which is entire line
+				if pos != 0 {
+					output += w
+				} //if
+			} //for
+		} //for
+
+		// If no style tags were found, use original line
+		if output == "" {
+			output += line
+		} //if
+	} //for
+
+	return output
+} //removeStyleTags
+
+func createSourceFile(filename, content string) (err error) {
 	var (
 		oFile *os.File
 	) //var
@@ -204,33 +238,10 @@ func removeStyleTags(filename string, lines []string, replaceStyleTags *regexp.R
 	} //if
 	defer oFile.Close()
 
-	for _, line := range lines {
-		var (
-			newLine string
-			styles  [][]string
-		) //var
-
-		styles = replaceStyleTags.FindAllStringSubmatch(line, -1)
-
-		for _, v := range styles {
-			for pos, w := range v {
-				// Ignore first element which is entire line
-				if pos != 0 {
-					newLine += w
-				} //if
-			} //for
-		} //for
-
-		// If no style tags were found, use original line
-		if newLine == "" {
-			newLine = line
-		} //if
-
-		// Append line to file
-		if _, err = oFile.Write([]byte(strings.TrimSpace(newLine) + "\n")); err != nil {
-			return err
-		} //if
-	} //for
+	// Append line to file
+	if _, err = oFile.Write([]byte(strings.TrimSpace(content) + "\n")); err != nil {
+		return err
+	} //if
 
 	return err
-} //removeStyleTags
+} //createSourceFile
