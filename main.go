@@ -21,16 +21,16 @@ var (
 ) //var
 
 func init() {
-	// Retrieve flags & set globals
+	// Retrieve flags and set globals
 	flag.StringVar(&I_FILENAME, "i", "", "'i' parameter must be specificed.")
 	flag.StringVar(&O_FILENAME, "o", "", "'o' parameter must be specificed.")
 	flag.Parse()
 
-	if I_FILENAME == "" {
+	if strings.TrimSpace(I_FILENAME) == "" {
 		log.Fatalln("'i' parameter must be specificed.")
 	} //if
 
-	if O_FILENAME == "" {
+	if strings.TrimSpace(O_FILENAME) == "" {
 		log.Fatalln("'o' parameter must be specificed.")
 	} //if
 } //init
@@ -65,10 +65,6 @@ func main() {
 	} //for
 
 	for element, rules := range allCssRules {
-		log.Println(element)
-		log.Println(rules)
-		log.Println("")
-
 		cssToAdd += element + " {"
 
 		for _, val := range rules {
@@ -77,9 +73,6 @@ func main() {
 
 		cssToAdd += "\n}\n"
 	} //for
-
-	log.Println("CSS to add:")
-	log.Println(cssToAdd)
 
 	if err = createCssFile(O_FILENAME, cssToAdd); err != nil {
 		log.Fatalln(err)
@@ -192,6 +185,7 @@ func createCssFile(filename, css string) (err error) {
 	} //if
 	defer oFile.Close()
 
+	// Write to new CSS file
 	if _, err = oFile.Write([]byte(strings.TrimSpace(css))); err != nil {
 		return err
 	} //if
@@ -204,8 +198,6 @@ func removeStyleTags(filename string, lines []string, replaceStyleTags *regexp.R
 		oFile *os.File
 	) //var
 
-	log.Println("Output:", filename+"_backup")
-
 	// Attempt to create the file
 	if oFile, err = os.OpenFile(filename+"_backup", os.O_CREATE|os.O_RDWR|os.O_APPEND, 0660); err != nil {
 		return err
@@ -213,21 +205,29 @@ func removeStyleTags(filename string, lines []string, replaceStyleTags *regexp.R
 	defer oFile.Close()
 
 	for _, line := range lines {
-		styles := replaceStyleTags.FindAllStringSubmatch(line, -1)
+		var (
+			newLine string
+			styles  [][]string
+		) //var
+
+		styles = replaceStyleTags.FindAllStringSubmatch(line, -1)
 
 		for _, v := range styles {
-			for _, w := range v {
-				line = w
+			for pos, w := range v {
+				// Ignore first element which is entire line
+				if pos != 0 {
+					newLine += w
+				} //if
 			} //for
 		} //for
 
-		if len(line) > 1 {
-			if line[len(line)-2:len(line)-1] != ">" {
-				line += ">"
-			} //if
+		// If no style tags were found, use original line
+		if newLine == "" {
+			newLine = line
 		} //if
 
-		if _, err = oFile.Write([]byte(strings.TrimSpace(line) + "\n")); err != nil {
+		// Append line to file
+		if _, err = oFile.Write([]byte(strings.TrimSpace(newLine) + "\n")); err != nil {
 			return err
 		} //if
 	} //for
